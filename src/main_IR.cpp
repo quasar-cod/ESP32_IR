@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <IRremoteESP8266.h>
+#include <ArduinoJSON.h>
 #include <ESPmDNS.h>
 #include <IRrecv.h>
 #include <IRutils.h>
@@ -10,41 +11,101 @@ const char* ssid = "TIM-24326654_EXT";// notte
 // const char* ssid = "TIM-24326654_TENDA";//tavernetta
 const char* password = "T9ZDHXACUfdTUC33DcTCASsz";
 const String serverPath = "http://myhomesmart.altervista.org/";
-#define ADDR "tappa" 
+#define ADDR "IR" 
+
+String action;
+String payload;
+String postData;
+HTTPClient http;
+int httpCode;
+// activity/board received from server
+String last_activity;
+String activity;
+String board;
 const uint16_t IR_PIN = 14;
 IRrecv irrecv(IR_PIN);decode_results results;
 
-// Rimuoviamo la costante fissa myboard perché la passeremo dinamicamente
-// const String myboard = ""; 
-
-void update_tappa(String protocollo, String mycommand) {
+void get_command(String mycommand) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    String fullURL = serverPath + "update_tappa.php";
+    String fullURL = serverPath + "get_command.php";
     http.begin(fullURL);
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
     // Ora 'board' conterrà il nome del protocollo del telecomando
-    String postData = "board=" + protocollo + "&command=" + mycommand;
-    
-    Serial.print("HTTP postData: ");
+    String postData = "command=" + mycommand;
+    Serial.println("---------------");  
+    Serial.print("postData: ");
     Serial.println(postData);
 
     int httpCode = http.POST(postData);
-    String payload = http.getString();
+    payload = http.getString();
 
-    Serial.print("HTTP Response Code: ");
+    Serial.print("httpCode: ");
     Serial.println(httpCode);
-    Serial.print("Risposta Server: ");
+    Serial.print("payload: ");
     Serial.println(payload);
     http.end();
   } else {
     Serial.println("WiFi disconnesso, impossibile inviare dati.");
   }
+  // allocate a JsonDocument with enough capacity for the expected
+  // payload (small, two strings).  Using a local document avoids
+  // problems with an uninitialised or zero‑capacity global object.
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, payload);
+  if (error) {
+    // print the error to help diagnose failures
+    Serial.print(F("Failed to parse JSON: "));
+    Serial.println(error.c_str());
+    // optionally dump the payload for debugging
+    Serial.print(F("raw payload: "));
+    Serial.println(payload);
+    return;
+  }
+  board = doc["board"].as<String>();
+  activity = doc["activity"].as<String>();
+  last_activity = doc["last_activity"].as<String>();
+  Serial.print("board: ");
+  Serial.println(board);
+  Serial.print("activity: ");
+  Serial.println(activity);
+  Serial.print("last_activity: ");
+  Serial.println(last_activity);
+}
+
+void update_activity(){
+  // compute next action based on last activity; ensure we always set something
+  if (last_activity == "UP" || last_activity == "DOWN") {
+    action = "OFF";
+  } else if (last_activity == "OFF") {
+    action = activity;
+  } else {
+    // fallback in case last_activity was empty or unexpected
+    action = activity;
+  }
+  payload = "";
+  postData = "board=";
+  postData += board;
+  postData += "&activity=";
+  postData += action;
+  Serial.println("---------------");
+  Serial.println("update_activity");  
+  Serial.println(postData);
+  String fullURL = serverPath + "update_activity.php";
+  http.begin(fullURL);
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded"); 
+  httpCode = http.POST(postData);
+  payload = http.getString();
+  Serial.print("httpCode: ");
+  Serial.println(httpCode);
+  Serial.print("payload: ");
+  Serial.println(payload);
+  http.end();
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(230400);
   // Connessione WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connessione WiFi in corso");
@@ -86,10 +147,10 @@ void loop() {
       Serial.println(final_command, HEX);
 
       // Invio al Database: passiamo sia il protocollo che il comando
-      update_tappa(remote_type, String(final_command, HEX));
-      
+      get_command(String(final_command, HEX));
+      update_activity();
       // Il delay di 5 secondi impedisce invii multipli accidentali
-      delay(5000);
+      delay(2000);
     }
 
     irrecv.resume(); // Ricevi il prossimo segnale
