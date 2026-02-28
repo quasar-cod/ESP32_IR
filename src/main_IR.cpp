@@ -35,6 +35,7 @@ void get_command(String mycommand) {
     // Ora 'board' conterrà il nome del protocollo del telecomando
     String postData = "command=" + mycommand;
     Serial.println("---------------");  
+    Serial.println("get_command.php");  
     Serial.print("postData: ");
     Serial.println(postData);
 
@@ -90,7 +91,7 @@ void update_activity(){
   postData += "&activity=";
   postData += action;
   Serial.println("---------------");
-  Serial.println("update_activity");  
+  Serial.println("update_activity.php");  
   Serial.println(postData);
   String fullURL = serverPath + "update_activity.php";
   http.begin(fullURL);
@@ -141,6 +142,7 @@ void loop() {
     }
 
     if (final_command != 0 && final_command != 0xFFFFFFFFFFFFFFFF) {
+      Serial.println("---------------");
       Serial.print("Protocollo: ");
       Serial.println(remote_type);
       Serial.print("Comando IR: 0x");
