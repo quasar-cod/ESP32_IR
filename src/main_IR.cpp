@@ -64,9 +64,30 @@ void get_command(String mycommand) {
     Serial.println(payload);
     return;
   }
-  board = doc["board"].as<String>();
-  activity = doc["activity"].as<String>();
-  last_activity = doc["last_activity"].as<String>();
+  // if the server returned an error message instead of the expected fields,
+  // make sure we treat board/activity as empty strings rather than the
+  // literal "null" text.
+  if (!doc["board"].isNull()) {
+    board = doc["board"].as<String>();
+    if (board == "null") board = "";      // sometimes ArduinoJson returns "null"
+  } else {
+    board = "";
+  }
+
+  if (!doc["activity"].isNull()) {
+    activity = doc["activity"].as<String>();
+    if (activity == "null") activity = "";
+  } else {
+    activity = "";
+  }
+
+  if (!doc["last_activity"].isNull()) {
+    last_activity = doc["last_activity"].as<String>();
+    if (last_activity == "null") last_activity = "";
+  } else {
+    last_activity = "";
+  }
+
   Serial.print("board: ");
   Serial.println(board);
   Serial.print("activity: ");
@@ -147,10 +168,13 @@ void loop() {
       Serial.println(remote_type);
       Serial.print("Comando IR: 0x");
       Serial.println(final_command, HEX);
-
+      // reset board to empty string before request
+      board = "";
       // Invio al Database: passiamo sia il protocollo che il comando
       get_command(String(final_command, HEX));
-      update_activity();
+      // only update activity if a valid board was returned
+      if (!board.isEmpty())  update_activity();
+      else  Serial.print("Comando non riconosciuto");
       // Il delay di 5 secondi impedisce invii multipli accidentali
       delay(2000);
     }

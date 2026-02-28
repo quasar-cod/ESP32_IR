@@ -18,7 +18,11 @@
       // One connection through whole application
       if ( null == self::$cont ) {     
         try {
-          self::$cont =  new PDO( "mysql:host=".self::$dbHost.";"."dbname=".self::$dbName, self::$dbUsername, self::$dbUserPassword); 
+					self::$cont =  new PDO( "mysql:host=".self::$dbHost.";"."dbname=".self::$dbName, self::$dbUsername, self::$dbUserPassword);
+					// throw exceptions on errors to make debugging easier
+					self::$cont->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+					// use real prepared statements when possible
+					self::$cont->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         } catch(PDOException $e) {
           die($e->getMessage()); 
         }
